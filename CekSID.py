@@ -42,15 +42,15 @@ def check_mapping_and_duplicates(file_path):
         # Membuat cursor
         cursor = connection.cursor()
 
-        # Mendapatkan data dari tabel-tabel yang diperlukan
+        # Mendapatkan data dari tabel mappingan salesman
         cursor.execute("SELECT muid_dist FROM fmap_salesman_dist")
         salesman_data = cursor.fetchall()
 
-        # tabel Cust
+        # Mendapatkan data dari tabel mappingan customer
         cursor.execute("SELECT CUSTNO_DIST FROM fcustmst_dist_map WHERE BRANCH_DIST = ?", (KodeDist,))
         customer_data = cursor.fetchall()
 
-        # tabel Product
+        # Mendapatkan data dari tabel mappingan product
         cursor.execute("SELECT PCODE FROM fmaster_dist WHERE DISTID = ?", (KodeDist,))
         product_data = cursor.fetchall()
 
