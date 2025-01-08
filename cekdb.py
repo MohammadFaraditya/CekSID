@@ -19,20 +19,20 @@ try:
     )
     print("Koneksi berhasil!")
     
-    # Membuat cursor
-    cursor = connection.cursor()
+    # # Membuat cursor
+    # cursor = connection.cursor()
     
-    # Query dengan parameter cust
-    cursor.execute("SELECT * FROM fcustmst a WHERE a.KODECABANG = ?", (KodeDist,))
+    # # Query dengan parameter cust
+    # cursor.execute("SELECT * FROM fcustmst a WHERE a.KODECABANG = ?", (KodeDist,))
 
-    # Query dengan parameter product
-    cursor.execute("SELECT * FROM fmaster_dist WHERE DISTID = ?", (KodeDist,))
+    # # Query dengan parameter product
+    # cursor.execute("SELECT * FROM fmaster_dist WHERE DISTID = ?", (KodeDist,))
 
-    # Query dengan parameter sales
-    cursor.execute("SELECT * FROM fmap_salesman_dist")
+    # # Query dengan parameter sales
+    # cursor.execute("SELECT * FROM fmap_salesman_dist")
 
-    for row in cursor.fetchall():
-        print(row)
+    # for row in cursor.fetchall():
+    #     print(row)
     
     # Menutup koneksi
     connection.close()

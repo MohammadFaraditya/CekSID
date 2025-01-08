@@ -42,16 +42,16 @@ def check_mapping_and_duplicates(file_path):
         cursor = connection.cursor()
 
         # Mendapatkan data dari tabel mappingan sales
-        cursor.execute("SELECT muid_dist FROM fmap_salesman_dist")
-        salesman_data = [x[0] for x in cursor.fetchall()]
+        cursor.execute("SELECT muid_dist, muid FROM fmap_salesman_dist")
+        salesman_data = [(str(x[0]).strip(), x[1]) for x in cursor.fetchall()] 
 
         # Mendapatkan data dari tabel mappingan customer
         cursor.execute("SELECT CUSTNO_DIST, CUSTNO FROM fcustmst_dist_map WHERE BRANCH_DIST = ?", (KodeDist,))
         customer_data = [(str(x[0]).strip(), x[1]) for x in cursor.fetchall()]  # Tuple (CUSTNO_DIST, CUSTNO)
 
         # Mendapatkan data dari tabel mappingan product
-        cursor.execute("SELECT PCODE FROM fmaster_dist WHERE DISTID = ?", (KodeDist,))
-        product_data = [x[0] for x in cursor.fetchall()]
+        cursor.execute("SELECT PCODE, PCODE_PRC FROM fmaster_dist WHERE DISTID = ?", (KodeDist,))
+        product_data = [(str(x[0]).strip(), x[1]) for x in cursor.fetchall()] 
 
         # Gabungkan kolom untuk pengecekan duplikat
         df['combined'] = df[InvoiceNo].astype(str) + '-' + df[SalesNo].astype(str) + '-' + df[CustNo].astype(str) + '-' + df[Pcode].astype(str) + '-' + df[TypeInvoice].astype(str)
@@ -63,11 +63,12 @@ def check_mapping_and_duplicates(file_path):
             status_list = []
 
             # Pengecekan SalesNo - cek apakah lebih dari satu data ditemukan
-            matching_salesman = [x for x in salesman_data if x == row[SalesNo]]
+            matching_salesman = [(sls[1], sls[0]) for sls in salesman_data if sls[0].strip() == str(row[SalesNo]).strip()]
             if len(matching_salesman) == 0:
                 status_list.append("SalesNo tidak termapping")
             elif len(matching_salesman) > 1:
-                status_list.append(f"SalesNo termapping lebih dari 1, jumlah: {len(matching_salesman)}")
+                slsnos = [sls[0] for sls in matching_salesman]
+                status_list.append(f"SalesNo termapping lebih dari 1, jumlah: {len(matching_salesman)} - SLSNO_PRC yang ditemukan: {', '.join(slsnos)}")
 
             # Pengecekan CustNo - cek apakah lebih dari satu data ditemukan
             matching_customer = [(cust[1], cust[0]) for cust in customer_data if cust[0].strip() == str(row[CustNo]).strip()]
@@ -75,19 +76,20 @@ def check_mapping_and_duplicates(file_path):
                 status_list.append("CustNo tidak termapping")
             elif len(matching_customer) > 1:
                 # Menampilkan semua CUSTNO yang cocok
-                custnos = [cust[1] for cust in matching_customer]
-                status_list.append(f"CustNo termapping lebih dari 1, jumlah: {len(matching_customer)} - CUSTNO yang ditemukan: {', '.join(custnos)}")
+                custnos = [cust[0] for cust in matching_customer]
+                status_list.append(f"CustNo termapping lebih dari 1, jumlah: {len(matching_customer)} - CUSTNO_DIST yang ditemukan: {', '.join(custnos)}")
 
             # Pengecekan Pcode - cek apakah lebih dari satu data ditemukan
-            matching_product = [x for x in product_data if x == row[Pcode]]
+            matching_product = [(pcd[1], pcd[0]) for pcd in product_data if pcd[0].strip() == str(row[Pcode]).strip()]
             if len(matching_product) == 0:
                 status_list.append("Pcode tidak termapping")
             elif len(matching_product) > 1:
-                status_list.append(f"Pcode termapping lebih dari 1, jumlah: {len(matching_product)}")
+                pcdnos = [pcd[0] for pcd in matching_product]
+                status_list.append(f"Pcode termapping lebih dari 1, jumlah: {len(matching_product)} - PCODE_PRC yang ditemukan: {', '.join(pcdnos)}")
 
             # Pengecekan data double
             if row['combined'] in duplicates['combined'].values:
-                if row[TypeInvoice] == "INV":
+                if row[TypeInvoice] == "I":
                     flag_bonus_value = row.get(FlagBonus)
                     if is_null(flag_bonus_value):
                         status_list.append("data double, FlagBonus tidak ada (null)")
@@ -112,7 +114,7 @@ def check_mapping_and_duplicates(file_path):
 
 
 # Masukkan path file .xlsx di bawah ini
-file_path = 'Mojokerto.xlsx'
+file_path = 'DES_MSLSINVDIST.xlsx'
 
 # Langkah pertama: Pengecekan mapping (SalesNo, CustNo, Pcode) dan duplikat
 check_mapping_and_duplicates(file_path)
