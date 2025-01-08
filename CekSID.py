@@ -17,7 +17,7 @@ FlagBonus = os.getenv('FlagBonus')
 
 # Fungsi untuk memeriksa apakah nilai adalah 'null' atau kosong
 def is_null(value):
-    return value is None or value == '' or value.lower() == 'null'
+    return value is None or value == '' or str(value).lower() == 'null'
 
 def check_mapping_and_duplicates(file_path):
     # Membaca file Excel
@@ -30,7 +30,6 @@ def check_mapping_and_duplicates(file_path):
             print(f"Kolom yang dibutuhkan '{col}' tidak ditemukan dalam file!")
             return df
     
-    # Menyiapkan list untuk hasil yang akan disimpan
     results = []
 
     # Membuat koneksi ke database
@@ -42,51 +41,51 @@ def check_mapping_and_duplicates(file_path):
         # Membuat cursor
         cursor = connection.cursor()
 
-        # Mendapatkan data dari tabel mappingan salesman
+        # Mendapatkan data dari tabel mappingan
         cursor.execute("SELECT muid_dist FROM fmap_salesman_dist")
-        salesman_data = cursor.fetchall()
+        salesman_data = [x[0] for x in cursor.fetchall()]
 
-        # Mendapatkan data dari tabel mappingan customer
         cursor.execute("SELECT CUSTNO_DIST FROM fcustmst_dist_map WHERE BRANCH_DIST = ?", (KodeDist,))
-        customer_data = cursor.fetchall()
+        customer_data = [str(x[0]).strip() for x in cursor.fetchall()]
 
-        # Mendapatkan data dari tabel mappingan product
         cursor.execute("SELECT PCODE FROM fmaster_dist WHERE DISTID = ?", (KodeDist,))
-        product_data = cursor.fetchall()
+        product_data = [x[0] for x in cursor.fetchall()]
 
-        # Membuat kolom baru yang menggabungkan kolom yang diperlukan untuk memudahkan pengecekan
         df['combined'] = df[InvoiceNo].astype(str) + '-' + df[SalesNo].astype(str) + '-' + df[CustNo].astype(str) + '-' + df[Pcode].astype(str) + '-' + df[TypeInvoice].astype(str)
 
-        # Mencari duplikat pada kolom 'combined' berdasarkan kondisi
         duplicates = df[df.duplicated(subset='combined', keep=False)]
-        
-        # Proses pengecekan SalesNo, CustNo, Pcode, dan duplikat
-        for _, row in df.iterrows():
-            # Pengecekan SalesNo
-            if row[SalesNo] not in [x[0] for x in salesman_data]:
-                results.append([row[InvoiceNo], row[SalesNo], row[CustNo], row[Pcode], KodeDist, "SalesNo tidak termapping"])
 
-            # Pengecekan CustNo (memastikan perbandingan menggunakan format string)
-            if str(row[CustNo]).strip() not in [str(x[0]).strip() for x in customer_data]:
-                results.append([row[InvoiceNo], row[SalesNo], row[CustNo], row[Pcode], KodeDist, "CustNo tidak termapping"])
+        for _, row in df.iterrows():
+            status_list = []
+
+            # Pengecekan SalesNo
+            if row[SalesNo] not in salesman_data:
+                status_list.append("SalesNo tidak termapping")
+
+            # Pengecekan CustNo
+            if str(row[CustNo]).strip() not in customer_data:
+                status_list.append("CustNo tidak termapping")
 
             # Pengecekan Pcode
-            if row[Pcode] not in [x[0] for x in product_data]:
-                results.append([row[InvoiceNo], row[SalesNo], row[CustNo], row[Pcode], KodeDist, "Pcode tidak termapping"])
+            if row[Pcode] not in product_data:
+                status_list.append("Pcode tidak termapping")
 
-            # Pengecekan duplikat dan FlagBonus
+            # Pengecekan data double
             if row['combined'] in duplicates['combined'].values:
                 if row[TypeInvoice] == "INV":
                     flag_bonus_value = row.get(FlagBonus)
-                    if is_null(flag_bonus_value):  # Jika FlagBonus tidak ada (null)
-                        results.append([row[InvoiceNo], row[SalesNo], row[CustNo], row[Pcode], KodeDist, "Data double, FlagBonus tidak ada (null) untuk data"])
+                    if is_null(flag_bonus_value):
+                        status_list.append("data double, FlagBonus tidak ada (null)")
                     else:
-                        results.append([row[InvoiceNo], row[SalesNo], row[CustNo], row[Pcode], KodeDist, "Data duplikat"])
+                        status_list.append("data double")
 
-        # Menutup koneksi
+            # Gabungkan semua status dalam satu string
+            if status_list:
+                results.append([row[InvoiceNo], row[SalesNo], row[CustNo], row[Pcode], KodeDist, ", ".join(status_list)])
+
         connection.close()
 
-        # Membuat DataFrame untuk hasil pengecekan
+        # Membuat DataFrame hasil
         results_df = pd.DataFrame(results, columns=['InvoiceNo', 'SalesNo', 'CustNo', 'Pcode', 'KodeDist', 'Status'])
 
         # Menyimpan hasil ke file Excel
