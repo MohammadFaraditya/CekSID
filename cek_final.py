@@ -7,40 +7,38 @@ import os
 load_dotenv()
 
 # Membaca variabel dari .env
-InvoiceNo = 'NoInv'
-SalesNo = 'KodeSales'
-CustNo = 'Kodecust'
-Pcode = 'KodeBrg'
-KodeDist = 'DIJMR003'
-TypeInvoice = 'TYPE'
-FlagBonus = 'BnsBarang'
-Qty = 'Satuan Pcs'
-dpp = 'SubTotal'
-tax = ''
-nett = 'TOTAL'
+InvoiceNo = 'invoiceNumber'
+SalesNo = 'salesmanID'
+CustNo = 'soldtoCustomerID'
+Pcode = 'productCode'
+KodeDist = 'DAKDS001'
+TypeInvoice = 'sellingType'
+FlagBonus = ''
+Qty = 'qtySold'
+dpp = 'lineGrossAmount'
+tax = 'tax1'
+nett = 'lineNetAmount'
 
 # Fungsi untuk memeriksa apakah nilai adalah 'null' atau kosong
 def is_null(value):
     return value is None or value == '' or str(value).lower() == 'null'
 
 def check_mapping_and_duplicates(file_path):
-    # Membaca file Excel
-    df = pd.read_excel(file_path)
+    # Menentukan tipe file berdasarkan ekstensi
+    if file_path.endswith('.xlsx'):
+        df = pd.read_excel(file_path)
+    elif file_path.endswith('.txt'):
+        df = pd.read_csv(file_path, delimiter='|')
+    else:
+        print("Format file tidak didukung")
+        return
 
     # Memastikan kolom yang diperlukan ada dalam file
-    required_columns = [InvoiceNo, SalesNo, CustNo, Pcode, TypeInvoice, Qty, dpp, nett]
+    required_columns = [InvoiceNo, SalesNo, CustNo, Pcode, TypeInvoice, Qty, dpp, tax, nett]
     for col in required_columns:
         if col not in df.columns:
             print(f"Kolom yang dibutuhkan '{col}' tidak ditemukan dalam file!")
             return df
-
-    for col in required_columns:
-        if df[col].isnull().any():
-            print(f"Ada nilai NaN pada kolom '{col}'")
-
-    # Memeriksa tipe data kolom
-    for col in required_columns:
-        print(f"Tipe data kolom '{col}': {df[col].dtype}")
 
     results = []
 
@@ -58,11 +56,11 @@ def check_mapping_and_duplicates(file_path):
         salesman_data = [(str(x[0]).strip(), x[1]) for x in cursor.fetchall()]  # Format (muid_dist, muid)
 
         # Mendapatkan data dari tabel mappingan customer
-        cursor.execute("SELECT CUSTNO_DIST, CUSTNO FROM fcustmst_dist_map WHERE BRANCH_DIST = ?", (KodeDist,))
+        cursor.execute("SELECT CUSTNO_DIST, CUSTNO FROM fcustmst_dist_map WHERE BRANCH = ?", (KodeDist,))
         customer_data = [(str(x[0]).strip(), x[1]) for x in cursor.fetchall()]  # Format (CUSTNO_DIST, CUSTNO)
 
         # Mendapatkan data dari tabel mappingan product
-        cursor.execute("SELECT PCODE, PCODE_PRC FROM fmaster_dist WHERE DISTID = ?", (KodeDist,))
+        cursor.execute("SELECT PCODE, PCODE_PRC FROM fmaster_dist fd INNER JOIN m_scabang_dist_map kd ON fd.DISTID = kd.DISTID WHERE kd.BID = ?", (KodeDist,))
         product_data = [(str(x[0]).strip(), x[1]) for x in cursor.fetchall()]  # Format (PCODE, PCODE_PRC)
 
         # Gabungkan kolom untuk pengecekan duplikat
@@ -74,6 +72,7 @@ def check_mapping_and_duplicates(file_path):
             df[TypeInvoice].astype(str) + '-' +
             df[Qty].astype(str) + '-' +
             df[dpp].astype(str) + '-' +
+            df[tax].astype(str) + '-' +
             df[nett].astype(str)
         )
 
@@ -110,7 +109,7 @@ def check_mapping_and_duplicates(file_path):
 
             # Pengecekan data double
             if row['combined'] in duplicates['combined'].values:
-                if row[TypeInvoice] == "INV":  # Periksa apakah invoice bertipe 'I'
+                if row[TypeInvoice] == "TO":  # Periksa apakah invoice bertipe 'I'
                     flag_bonus_value = row.get(FlagBonus)
                     if is_null(flag_bonus_value):
                         status_list.append("Data double, FlagBonus tidak ada (null)")
@@ -134,8 +133,8 @@ def check_mapping_and_duplicates(file_path):
     except Exception as e:
         print("Terjadi kesalahan:", e)
 
-# Masukkan path file .xlsx di bawah ini
-file_path = 'Mikhael_2.xlsx'
+# Masukkan path file (baik .xlsx atau .txt) di bawah ini
+file_path = 'Kudus.txt'  # Ganti dengan nama file Anda
 
 # Langkah pertama: Pengecekan mapping (SalesNo, CustNo, Pcode) dan duplikat
 check_mapping_and_duplicates(file_path)
