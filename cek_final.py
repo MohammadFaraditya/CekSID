@@ -7,17 +7,17 @@ import os
 load_dotenv()
 
 # Membaca variabel dari .env
-InvoiceNo = os.getenv("InvoiceNo")
-SalesNo = os.getenv("SalesNo")
-CustNo = os.getenv("CustNo")
-Pcode = os.getenv("Pcode")
-KodeDist = os.getenv("KodeDist")
-TypeInvoice = os.getenv("TypeINV")
-FlagBonus = os.getenv('FlagBonus')
-Qty = os.getenv('Qty')  # Variabel tambahan
-dpp = os.getenv('DPP')  # Variabel tambahan
-tax = os.getenv('TAX')  # Variabel tambahan
-nett = os.getenv('NETT')  # Variabel tambahan
+InvoiceNo = 'NoInv'
+SalesNo = 'KodeSales'
+CustNo = 'Kodecust'
+Pcode = 'KodeBrg'
+KodeDist = 'DIJMR003'
+TypeInvoice = 'TYPE'
+FlagBonus = 'BnsBarang'
+Qty = 'Satuan Pcs'
+dpp = 'SubTotal'
+tax = ''
+nett = 'TOTAL'
 
 # Fungsi untuk memeriksa apakah nilai adalah 'null' atau kosong
 def is_null(value):
@@ -28,7 +28,7 @@ def check_mapping_and_duplicates(file_path):
     df = pd.read_excel(file_path)
 
     # Memastikan kolom yang diperlukan ada dalam file
-    required_columns = [InvoiceNo, SalesNo, CustNo, Pcode, TypeInvoice, Qty, dpp, tax, nett]
+    required_columns = [InvoiceNo, SalesNo, CustNo, Pcode, TypeInvoice, Qty, dpp, nett]
     for col in required_columns:
         if col not in df.columns:
             print(f"Kolom yang dibutuhkan '{col}' tidak ditemukan dalam file!")
@@ -66,7 +66,6 @@ def check_mapping_and_duplicates(file_path):
             df[TypeInvoice].astype(str) + '-' +
             df[Qty].astype(str) + '-' +
             df[dpp].astype(str) + '-' +
-            df[tax].astype(str) + '-' +
             df[nett].astype(str)
         )
 
@@ -128,7 +127,7 @@ def check_mapping_and_duplicates(file_path):
         print("Terjadi kesalahan:", e)
 
 # Masukkan path file .xlsx di bawah ini
-file_path = 'Bangkalan.xlsx'
+file_path = 'Mikhael_2.xlsx'
 
 # Langkah pertama: Pengecekan mapping (SalesNo, CustNo, Pcode) dan duplikat
 check_mapping_and_duplicates(file_path)

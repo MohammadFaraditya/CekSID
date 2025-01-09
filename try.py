@@ -7,13 +7,17 @@ import os
 load_dotenv()
 
 # Membaca variabel dari .env
-InvoiceNo = os.getenv("InvoiceNo")
-SalesNo = os.getenv("SalesNo")
-CustNo = os.getenv("CustNo")
-Pcode = os.getenv("Pcode")
-KodeDist = os.getenv("KodeDist")
-TypeInvoice = os.getenv("TypeINV")
-FlagBonus = os.getenv('FlagBonus')
+InvoiceNo = 'invoiceNumber'
+SalesNo = 'salesmanID'
+CustNo = 'soldtoCustomerID'
+Pcode = 'productCode'
+KodeDist = 'DAMGT001'
+TypeInvoice = 'sellingType'
+FlagBonus = ''
+Qty = 'qtySold'
+dpp = 'lineGrossAmount'
+tax = 'tax1'
+nett = 'lineNetAmount'
 
 # Fungsi untuk memeriksa apakah nilai adalah 'null' atau kosong
 def is_null(value):
@@ -24,12 +28,12 @@ def check_mapping_and_duplicates(file_path):
     df = pd.read_excel(file_path)
 
     # Memastikan kolom yang diperlukan ada dalam file
-    required_columns = [InvoiceNo, SalesNo, CustNo, Pcode, TypeInvoice]
+    required_columns = [InvoiceNo, SalesNo, CustNo, Pcode, TypeInvoice, Qty, dpp, tax, nett]
     for col in required_columns:
         if col not in df.columns:
             print(f"Kolom yang dibutuhkan '{col}' tidak ditemukan dalam file!")
             return df
-    
+
     results = []
 
     # Membuat koneksi ke database
@@ -43,22 +47,33 @@ def check_mapping_and_duplicates(file_path):
 
         # Mendapatkan data dari tabel mappingan sales
         cursor.execute("SELECT muid_dist, muid FROM fmap_salesman_dist")
-        salesman_data = [(str(x[0]).strip(), x[1]) for x in cursor.fetchall()] 
+        salesman_data = [(str(x[0]).strip(), x[1]) for x in cursor.fetchall()]  # Format (muid_dist, muid)
 
         # Mendapatkan data dari tabel mappingan customer
         cursor.execute("SELECT CUSTNO_DIST, CUSTNO FROM fcustmst_dist_map WHERE BRANCH_DIST = ?", (KodeDist,))
-        customer_data = [(str(x[0]).strip(), x[1]) for x in cursor.fetchall()]  # Tuple (CUSTNO_DIST, CUSTNO)
+        customer_data = [(str(x[0]).strip(), x[1]) for x in cursor.fetchall()]  # Format (CUSTNO_DIST, CUSTNO)
 
         # Mendapatkan data dari tabel mappingan product
         cursor.execute("SELECT PCODE, PCODE_PRC FROM fmaster_dist WHERE DISTID = ?", (KodeDist,))
-        product_data = [(str(x[0]).strip(), x[1]) for x in cursor.fetchall()] 
+        product_data = [(str(x[0]).strip(), x[1]) for x in cursor.fetchall()]  # Format (PCODE, PCODE_PRC)
 
         # Gabungkan kolom untuk pengecekan duplikat
-        df['combined'] = df[InvoiceNo].astype(str) + '-' + df[SalesNo].astype(str) + '-' + df[CustNo].astype(str) + '-' + df[Pcode].astype(str) + '-' + df[TypeInvoice].astype(str)
-        
+        df['combined'] = (
+            df[InvoiceNo].astype(str) + '-' + 
+            df[SalesNo].astype(str) + '-' + 
+            df[CustNo].astype(str) + '-' + 
+            df[Pcode].astype(str) + '-' + 
+            df[TypeInvoice].astype(str) + '-' +
+            df[Qty].astype(str) + '-' +
+            df[dpp].astype(str) + '-' +
+            df[tax].astype(str) + '-' +
+            df[nett].astype(str)
+        )
+
         # Temukan duplikat
         duplicates = df[df.duplicated(subset='combined', keep=False)]
 
+        # Proses setiap baris data
         for _, row in df.iterrows():
             status_list = []
 
@@ -68,16 +83,15 @@ def check_mapping_and_duplicates(file_path):
                 status_list.append("SalesNo tidak termapping")
             elif len(matching_salesman) > 1:
                 slsnos = [sls[0] for sls in matching_salesman]
-                status_list.append(f"SalesNo termapping lebih dari 1, jumlah: {len(matching_salesman)} - SLSNO_PRC yang ditemukan: {', '.join(slsnos)}")
+                status_list.append(f"SlsNo termapping lebih dari 1, jumlah: {len(matching_salesman)} - SLSNO_PRC yang ditemukan: {', '.join(slsnos)}")
 
             # Pengecekan CustNo - cek apakah lebih dari satu data ditemukan
             matching_customer = [(cust[1], cust[0]) for cust in customer_data if cust[0].strip() == str(row[CustNo]).strip()]
             if len(matching_customer) == 0:
                 status_list.append("CustNo tidak termapping")
             elif len(matching_customer) > 1:
-                # Menampilkan semua CUSTNO yang cocok
                 custnos = [cust[0] for cust in matching_customer]
-                status_list.append(f"CustNo termapping lebih dari 1, jumlah: {len(matching_customer)} - CUSTNO_DIST yang ditemukan: {', '.join(custnos)}")
+                status_list.append(f"CustNo termapping lebih dari 1, jumlah: {len(matching_customer)} - CUSTNO_PRC yang ditemukan: {', '.join(custnos)}")
 
             # Pengecekan Pcode - cek apakah lebih dari satu data ditemukan
             matching_product = [(pcd[1], pcd[0]) for pcd in product_data if pcd[0].strip() == str(row[Pcode]).strip()]
@@ -89,17 +103,18 @@ def check_mapping_and_duplicates(file_path):
 
             # Pengecekan data double
             if row['combined'] in duplicates['combined'].values:
-                if row[TypeInvoice] == "I":
+                if row[TypeInvoice] == "TO":  # Periksa apakah invoice bertipe 'I'
                     flag_bonus_value = row.get(FlagBonus)
                     if is_null(flag_bonus_value):
-                        status_list.append("data double, FlagBonus tidak ada (null)")
+                        status_list.append("Data double, FlagBonus tidak ada (null)")
                     else:
-                        status_list.append("data double")
+                        status_list.append("Data double")
 
             # Gabungkan semua status dalam satu string
             if status_list:
                 results.append([row[InvoiceNo], row[SalesNo], row[CustNo], row[Pcode], KodeDist, ", ".join(status_list)])
 
+        # Menutup koneksi ke database
         connection.close()
 
         # Membuat DataFrame hasil
@@ -112,9 +127,8 @@ def check_mapping_and_duplicates(file_path):
     except Exception as e:
         print("Terjadi kesalahan:", e)
 
-
 # Masukkan path file .xlsx di bawah ini
-file_path = 'DES_MSLSINVDIST.xlsx'
+file_path = 'Magetan.xlsx'
 
 # Langkah pertama: Pengecekan mapping (SalesNo, CustNo, Pcode) dan duplikat
 check_mapping_and_duplicates(file_path)
