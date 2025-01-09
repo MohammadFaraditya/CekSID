@@ -11,7 +11,7 @@ InvoiceNo = 'invoiceNumber'
 SalesNo = 'salesmanID'
 CustNo = 'soldtoCustomerID'
 Pcode = 'productCode'
-KodeDist = 'DAMGT001'
+KodeDist = 'DAKDS001'
 TypeInvoice = 'sellingType'
 FlagBonus = ''
 Qty = 'qtySold'
@@ -24,8 +24,14 @@ def is_null(value):
     return value is None or value == '' or str(value).lower() == 'null'
 
 def check_mapping_and_duplicates(file_path):
-    # Membaca file Excel
-    df = pd.read_excel(file_path)
+    # Menentukan tipe file berdasarkan ekstensi
+    if file_path.endswith('.xlsx'):
+        df = pd.read_excel(file_path)
+    elif file_path.endswith('.txt'):
+        df = pd.read_csv(file_path, delimiter='|')
+    else:
+        print("Format file tidak didukung")
+        return
 
     # Memastikan kolom yang diperlukan ada dalam file
     required_columns = [InvoiceNo, SalesNo, CustNo, Pcode, TypeInvoice, Qty, dpp, tax, nett]
@@ -50,11 +56,11 @@ def check_mapping_and_duplicates(file_path):
         salesman_data = [(str(x[0]).strip(), x[1]) for x in cursor.fetchall()]  # Format (muid_dist, muid)
 
         # Mendapatkan data dari tabel mappingan customer
-        cursor.execute("SELECT CUSTNO_DIST, CUSTNO FROM fcustmst_dist_map WHERE BRANCH_DIST = ?", (KodeDist,))
+        cursor.execute("SELECT CUSTNO_DIST, CUSTNO FROM fcustmst_dist_map WHERE BRANCH = ?", (KodeDist,))
         customer_data = [(str(x[0]).strip(), x[1]) for x in cursor.fetchall()]  # Format (CUSTNO_DIST, CUSTNO)
 
         # Mendapatkan data dari tabel mappingan product
-        cursor.execute("SELECT PCODE, PCODE_PRC FROM fmaster_dist WHERE DISTID = ?", (KodeDist,))
+        cursor.execute("SELECT PCODE, PCODE_PRC FROM fmaster_dist fd INNER JOIN m_scabang_dist_map kd ON fd.DISTID = kd.DISTID WHERE kd.BID = ?", (KodeDist,))
         product_data = [(str(x[0]).strip(), x[1]) for x in cursor.fetchall()]  # Format (PCODE, PCODE_PRC)
 
         # Gabungkan kolom untuk pengecekan duplikat
@@ -127,8 +133,8 @@ def check_mapping_and_duplicates(file_path):
     except Exception as e:
         print("Terjadi kesalahan:", e)
 
-# Masukkan path file .xlsx di bawah ini
-file_path = 'Magetan.xlsx'
+# Masukkan path file (baik .xlsx atau .txt) di bawah ini
+file_path = 'Kudus.txt'  # Ganti dengan nama file Anda
 
 # Langkah pertama: Pengecekan mapping (SalesNo, CustNo, Pcode) dan duplikat
 check_mapping_and_duplicates(file_path)

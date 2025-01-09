@@ -34,6 +34,14 @@ def check_mapping_and_duplicates(file_path):
             print(f"Kolom yang dibutuhkan '{col}' tidak ditemukan dalam file!")
             return df
 
+    for col in required_columns:
+        if df[col].isnull().any():
+            print(f"Ada nilai NaN pada kolom '{col}'")
+
+    # Memeriksa tipe data kolom
+    for col in required_columns:
+        print(f"Tipe data kolom '{col}': {df[col].dtype}")
+
     results = []
 
     # Membuat koneksi ke database
